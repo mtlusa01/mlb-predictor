@@ -1,0 +1,26 @@
+# Placeholder — will be configured once model is tested
+# Same pattern as nhl-predictor and ncaab-predictor workflows
+name: Daily MLB Predictions
+
+on:
+  # schedule:
+  #   - cron: '0 14 * * *'  # 10am ET — before first pitch
+  workflow_dispatch:
+
+jobs:
+  predict:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Run pipeline
+        env:
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: |
+          python get_data.py
+          python fetch_odds.py
+          python mlb_model.py --today
+          python export_projections.py
