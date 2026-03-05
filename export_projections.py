@@ -44,12 +44,19 @@ def enhance_predictions(predictions, vegas_map):
         if v:
             if p.get("spread_line") is None and v.get("spread_home") is not None:
                 p["spread_line"] = v["spread_home"]
-            if p.get("spread_odds") is None and v.get("spread_home_odds") is not None:
-                p["spread_odds"] = v["spread_home_odds"]
+            if p.get("spread_odds") is None:
+                # Pick odds for the recommended side
+                if p.get("spread_pick_side") == "HOME" or p.get("spread_pick") == p.get("home_team"):
+                    p["spread_odds"] = v.get("spread_home_odds")
+                else:
+                    p["spread_odds"] = v.get("spread_away_odds")
             if p.get("total_line") is None and v.get("total_line") is not None:
                 p["total_line"] = v["total_line"]
-            if p.get("total_odds") is None and v.get("over_odds") is not None:
-                p["total_odds"] = v["over_odds"]
+            if p.get("total_odds") is None:
+                if "over" in str(p.get("total_pick", "")).lower():
+                    p["total_odds"] = v.get("over_odds")
+                else:
+                    p["total_odds"] = v.get("under_odds")
             if p.get("ml_odds") is None:
                 # Figure out which side we picked
                 if p.get("ml_pick") == p.get("home_team") and v.get("ml_home") is not None:
