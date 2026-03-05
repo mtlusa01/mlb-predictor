@@ -340,6 +340,7 @@ def copy_and_push():
     files_to_copy = [
         (PROJ_PATH, "mlb_game_projections.json"),
         (RESULTS_PATH, "mlb_results.json"),
+        (os.path.join(os.path.dirname(__file__), "mlb_recommended.json"), "mlb_recommended.json"),
     ]
 
     for src, fname in files_to_copy:
@@ -351,7 +352,7 @@ def copy_and_push():
     # Git commit and push
     try:
         subprocess.run(
-            ["git", "add", "mlb_game_projections.json", "mlb_results.json"],
+            ["git", "add", "mlb_game_projections.json", "mlb_results.json", "mlb_recommended.json"],
             cwd=MATTEV_DIR, check=True, capture_output=True,
         )
         subprocess.run(

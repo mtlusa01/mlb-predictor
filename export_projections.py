@@ -114,6 +114,9 @@ def run():
             })
     best_bets.sort(key=lambda x: x["confidence"], reverse=True)
 
+    # Lock recommendations (enrich with pick info from predictions)
+    _write_recommendation_lock(best_bets, predictions, data.get("date", datetime.now().strftime("%Y-%m-%d")))
+
     # Format output
     output = {
         "date": data.get("date", datetime.now().strftime("%Y-%m-%d")),
@@ -140,5 +143,81 @@ def run():
             print(f"    {bb['game']} — {bb['type'].upper()} ({bb['confidence']}%)")
 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _write_recommendation_lock(best_bets, predictions, game_date=None):
+    """Write mlb_recommended.json — locked once per day."""
+    today = game_date or datetime.now().strftime("%Y-%m-%d")
+    lock_path = os.path.join(SCRIPT_DIR, "mlb_recommended.json")
+
+    # Check if already locked for today
+    try:
+        with open(lock_path) as f:
+            existing = json.load(f)
+        if existing.get("date") == today and existing.get("recommendations"):
+            print(f"  mlb_recommended.json LOCKED for {today} — skipping")
+            return
+    except Exception:
+        pass
+
+    # Build lookup for picks from predictions
+    pick_lookup = {}
+    for p in predictions:
+        key = f"{p.get('away_team')} @ {p.get('home_team')}"
+        pick_lookup[key] = p
+
+    # Convert best_bets to unified recommendation format
+    recs = []
+    for i, bb in enumerate(best_bets[:5]):
+        game_data = pick_lookup.get(bb["game"], {})
+        bt = bb["type"]
+        if bt == "spread":
+            pick = game_data.get("spread_pick", "")
+        elif bt == "total":
+            tp = game_data.get("total_pick", "")
+            tl = game_data.get("total_line", "")
+            pick = f"{tp} {tl}".strip()
+        elif bt == "ml":
+            pick = game_data.get("ml_pick", "")
+        else:
+            pick = ""
+        recs.append({
+            "bet_type": bt.capitalize() if bt != "ml" else "ML",
+            "game": bb["game"],
+            "pick": pick,
+            "confidence": bb["confidence"],
+            "away_team": game_data.get("away_team", ""),
+            "home_team": game_data.get("home_team", ""),
+            "reasons": [f"{bb['confidence']}% model confidence"],
+            "rec_rank": i + 1,
+        })
+
+    lock_data = {
+        "date": today,
+        "sport": "MLB",
+        "type": "game",
+        "locked_at": datetime.now().isoformat(timespec="seconds"),
+        "recommendations": recs,
+    }
+
+    with open(lock_path, "w") as f:
+        json.dump(lock_data, f, indent=2)
+    print(f"  Locked {len(recs)} MLB game recommendations")
+
+
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="MLB Export Projections")
+    parser.add_argument("--unlock-recommendations", action="store_true",
+                        help="Delete locked recommendation file so it regenerates")
+    args = parser.parse_args()
+
+    if args.unlock_recommendations:
+        lock_path = os.path.join(SCRIPT_DIR, "mlb_recommended.json")
+        if os.path.exists(lock_path):
+            os.remove(lock_path)
+            print(f"  Deleted {lock_path}")
+        print("  MLB recommendation lock cleared")
+
     run()
